@@ -51,15 +51,15 @@ def interpolation(lon, lat, lst):
                 sum1_low += wi_low
 
     # Interpolated values for avg_temp, high_temp, and low_temp
-    avg_temp_interp = round(sum0_avg / sum1_avg, 4) if sum0_avg != 0 else -9999999
-    high_temp_interp = round(sum0_high / sum1_high, 4) if sum0_high != 0 else -9999999
-    low_temp_interp = round(sum0_low / sum1_low, 4) if sum0_low != 0 else -9999999
+    avg_temp_interp = round(sum0_avg / sum1_avg, 4) if sum1_avg != 0 else -9999999
+    high_temp_interp = round(sum0_high / sum1_high, 4) if sum1_high != 0 else -9999999
+    low_temp_interp = round(sum0_low / sum1_low, 4) if sum1_low != 0 else -9999999
     return avg_temp_interp, high_temp_interp, low_temp_interp
 
 all_district = []
 
 def read_data():
-    county = pd.read_excel('../map (administrative division)/county_geo.xlsx')
+    county = pd.read_excel('./county_geo_new.xlsx')
 
     for idx, row in county.iterrows():
         all_district.append(
@@ -68,12 +68,12 @@ def read_data():
 
 if __name__ == '__main__':
     read_data()
-    dirs = os.listdir('../weather/raw data/SURF_CLI_CHN_MUL_DAY_V3.0\processed\splitday')
-    exist_dirs = set(os.listdir('../weather/raw data/SURF_CLI_CHN_MUL_DAY_V3.0/processed/county_int'))
+    dirs = os.listdir('./test\splitday')
+    exist_dirs = set(os.listdir('./test/county_int'))
     for file_path in dirs:
         if exist_dirs.__contains__(file_path):
             continue
-        df = pd.read_csv('../weather/raw data/SURF_CLI_CHN_MUL_DAY_V3.0/processed/splitday/' + file_path)
+        df = pd.read_csv('./test\splitday/' + file_path)
         stations = []
         for idx, row in df.iterrows():
             x, y, avg_temp, high_temp, low_temp = row['LON'], row['LAT'], row['avg_temp'], row['high_temp'], row['low_temp']
@@ -86,5 +86,5 @@ if __name__ == '__main__':
             results.append([str(district['name']), str(district['countycode']), avg_temp_interp, high_temp_interp, low_temp_interp])
 
         out = pd.DataFrame(results)
-        out.to_csv('../weather/raw data/SURF_CLI_CHN_MUL_DAY_V3.0/processed/county_int/' + file_path, header=['countyname', 'countycode', 'avg_temp', 'high_temp', 'low_temp'])
+        out.to_csv('./test/county_int/' + file_path, header=['countyname', 'countycode', 'avg_temp', 'high_temp', 'low_temp'])
         print('finish \t' + file_path)

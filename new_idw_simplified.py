@@ -28,18 +28,26 @@ def quality_control(var, code, column):
     if code != 0:  # Exclude non-zero control codes
         return None
 
-    if column == 'rhu_var9' and var > 300:  # exclusion for relative humidity
+    if column == 'RHU_var9' and var > 300:  # exclusion for relative humidity
         return None
     if var == 32700:  # For special code 32700 (微量降水) in precipitation columns, replace them with specific values
-        if column in {'pre_var8', 'pre_var9'}:  # half-day measurement
+        if column in {'PRE_var8', 'PRE_var9'}:  # half-day measurement
             return 0.5
-        elif column == 'pre_var10':  # a single day measurement
+        elif column == 'PRE_var10':  # a single day measurement
             return 1  # according to the definition of 微量降水: < 0.1mm a day
 
     if var > 30000:  # Exclude other potential characteristic values (e.g.,30XXX: snow amount)
         return None
     return var
 
+# rescale the original records
+def rescale (value, column):
+    if column in {'TEM_var8', 'TEM_var9', 'TEM_var10'}:
+        return value/10
+    if column in {'RHU_var8', 'RHU_var9'}:
+        return value/100
+    if column in {'PRE_var8', 'PRE_var9', 'PRE_var10'}:
+        return value/10
 
 # Dynamic IDW interpolation of weather data at a specific lon, lat
 def interpolate_dynamic(lon, lat, period, weather_vars, quality_code):
@@ -50,8 +58,8 @@ def interpolate_dynamic(lon, lat, period, weather_vars, quality_code):
     # power of the IDW setting
     P = 2
     for idx2, row2 in period.iterrows():  # loop over station obs records for one day
-        Di = geodistance(lon, lat, row2['LON'],
-                         row2['LAT'])  # Calculate distance between county center & station locations
+        Di = geodistance(lon, lat, row2['longitude'],
+                         row2['latitude'])  # Calculate distance between county center & station locations
         if Di == 0:
             return {exact: quality_control(row2[exact], row2[quality_code[idx3]], exact)
                     for idx3, exact in enumerate(weather_vars)}
@@ -63,7 +71,8 @@ def interpolate_dynamic(lon, lat, period, weather_vars, quality_code):
                 # call up the function to judge whether the data should be included in calculation
                 var = quality_control(row2[column], row2[quality_column], column)
                 if var is not None:  # If the variable value is valid, use it for interpolation
-                    sums[column] += var * wi
+                    re_var = rescale(var, column)
+                    sums[column] += re_var * wi
                     w_sums[column] += wi
     # store the daily interpolated weather values in a dictionary format
     return {column: round(sums[column] / w_sums[column], 4) if w_sums[column] != 0 else 32766 for column in
@@ -86,43 +95,37 @@ def apply_interpolation(data, date, level, weather_vars, quality_code):
 
 
 def main():
-    county = pd.read_excel('D:\projects\weather\county_test.xlsx')  # Contains coordinates of urban districts
-    data_dir = 'D:\projects\weather/test'
-    output_dir = 'D:\projects\weather\out'
+    county = pd.read_excel('./county_geo_new.xlsx')  # Contains coordinates of urban districts
+    data_dir = 'D:\projects\dta_new'
+    output_dir = 'D:\projects\output'
 
-    weather_vars = ['tem_var8', 'tem_var9', 'tem_var10', 'rhu_var8', 'rhu_var9', 'pre_var8', 'pre_var9', 'pre_var10']
-    quality_code = ['tem_var11', 'tem_var12', 'tem_var13', 'rhu_var10', 'rhu_var11', 'pre_var11', 'pre_var12',
-                    'pre_var13']
+    weather_vars = ['TEM_var8', 'TEM_var9', 'TEM_var10', 'RHU_var8', 'RHU_var9', 'PRE_var8', 'PRE_var9', 'PRE_var10']
+    quality_code = ['TEM_var11', 'TEM_var12', 'TEM_var13', 'RHU_var10', 'RHU_var11', 'PRE_var11', 'PRE_var12',
+                    'PRE_var13']
 
     for f in os.listdir(data_dir):
-        # Extracts the year from the input filename
-        infor = f.split('-')[-1].split('.')[0]
-        # Constructs the expected output filename
-        output_file_path = os.path.join(output_dir, f"{infor}.csv")
-        # Check if output_file_path already exists
-        if os.path.exists(output_file_path):
-            continue
-
         weather_df = pd.read_stata(os.path.join(data_dir, f))
-        weather_df['LON'], weather_df['LAT'] = weather_df['LON'].apply(dms_to_dd), weather_df['LAT'].apply(dms_to_dd)
+        weather_df['longitude'], weather_df['latitude'] = weather_df['longitude'].apply(dms_to_dd), weather_df['latitude'].apply(dms_to_dd)
         # convert to timestamp and exclude 'hour:min:sec' information
         weather_df['datetime'] = pd.to_datetime(weather_df[['year', 'month', 'day']]).dt.date
         # if NA exists in the value columns, filled with 32766
         weather_df[weather_vars] = weather_df[weather_vars].fillna(32766)
 
         outputs = []
-        # merge interpolation results for multiple days
+        # daily interpolation
         for day in weather_df['datetime'].unique():
             print(day)
+            # Constructs the expected output filename
+            output_file_path = os.path.join(output_dir, f"{day}.csv")
+            # Check if output_file_path already exists
+            if os.path.exists(output_file_path):
+                continue
+
             output = apply_interpolation(weather_df, day, county, weather_vars, quality_code)
-            outputs.extend(output)  # use 'extend' instead of 'append' to keep 'output' data structure
-
-        df = pd.DataFrame(outputs,
-                          columns=['countyname', 'countycode', 'date', 'avg_tem', 'max_tem', 'min_tem', 'avg_rhu',
-                                   'min_rhu', 'eve_pre', 'mor_pre', 'day_pre'])
-        df.to_csv(os.path.join(output_dir, f'{day.year}.csv'), index=False, encoding='utf_8_sig')
-        # f-string formatting to include the year of the 'date' variable
-
+            df = pd.DataFrame(output,
+                              columns=['countyname', 'countycode', 'date', 'avg_tem', 'max_tem', 'min_tem', 'avg_rhu',
+                                       'min_rhu', 'eve_pre', 'mor_pre', 'day_pre'])
+            df.to_csv(os.path.join(output_dir, f'{day}.csv'), index=False, encoding='utf_8_sig')
 
 if __name__ == '__main__':
     main()

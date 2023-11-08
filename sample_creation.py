@@ -1,5 +1,6 @@
 import pandas as pd
 
+a = pd.read_stata ('D:\projects\dta_new\SURF_CLI_CHN_MUL_DAY-1951.dta')
 # Create a DataFrame
 data = pd.DataFrame({
     'year': [1995, 1995, 1995, 1995, 1995, 1995],

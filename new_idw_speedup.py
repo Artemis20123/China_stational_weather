@@ -100,6 +100,7 @@ def apply_interpolation(data, date, level, weather_vars, quality_code):
 def speedup_interpolation(params):
     weather_df, day, county, weather_vars, quality_code, output_dir = params
     output_file_path = os.path.join(output_dir, f"{day}.csv")
+    print(day)
     if os.path.exists(output_file_path):
         return
     output = apply_interpolation(weather_df, day, county, weather_vars, quality_code)

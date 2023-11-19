@@ -1,0 +1,3 @@
+But now I want some changes. Currently, for each station record, it calculates the distance and then do the interpolation. But since the distance between stations and county centers are fixed, this duplicated task is a waste. So I want you break this code into 2 parts. 1. For each county center, find the stations within the 200km (Di < 200) range and store the information such as lons, lats, distances. 2. For daily interpolation, for each county only use the stored information
+
+Make changes to the step 2 entire code. Since you now store the nearest station infor in a 'data_dict' dictionary, all the relavant functions change accordingly. Just regenerate it based on the original code and the output from the step 1 code
